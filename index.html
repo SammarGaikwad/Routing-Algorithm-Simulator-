@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Routing Algorithm Simulator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+
+        .toast {
+            visibility: hidden;
+            min-width: 250px;
+            background-color: #333;
+            color: #fff;
+            text-align: center;
+            border-radius: 8px;
+            padding: 16px;
+            position: fixed;
+            z-index: 1001;
+            left: 50%;
+            transform: translateX(-50%);
+            bottom: 30px;
+            font-size: 17px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+
+        .toast.show {
+            visibility: visible;
+            -webkit-animation: fadein 0.5s, fadeout 0.5s 2.5s;
+            animation: fadein 0.5s, fadeout 0.5s 2.5s;
+        }
+
+        @-webkit-keyframes fadein {
+            from {bottom: 0; opacity: 0;}
+            to {bottom: 30px; opacity: 1;}
+        }
+
+        @keyframes fadein {
+            from {bottom: 0; opacity: 0;}
+            to {bottom: 30px; opacity: 1;}
+        }
+
+        @-webkit-keyframes fadeout {
+            from {bottom: 30px; opacity: 1;}
+            to {bottom: 0; opacity: 0;}
+        }
+
+        @keyframes fadeout {
+            from {bottom: 30px; opacity: 1;}
+            to {bottom: 0; opacity: 0;}
+        }
+
+        /* Custom scrollbar for output */
+        #output, #outputText {
+            scrollbar-width: thin;
+            scrollbar-color: #4A5568 #2D3748;
+        }
+        #output::-webkit-scrollbar, #outputText::-webkit-scrollbar {
+            width: 8px;
+        }
+        #output::-webkit-scrollbar-track, #outputText::-webkit-scrollbar-track {
+            background: #2D3748;
+        }
+        #output::-webkit-scrollbar-thumb, #outputText::-webkit-scrollbar-thumb {
+            background-color: #4A5568;
+            border-radius: 10px;
+            border: 2px solid #2D3748;
+        }
+        
+        /* Ensure the body takes up full height for the flex layout to work */
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100 flex flex-col md:flex-row h-full overflow-hidden">
+
+    <!-- Controls Panel -->
+    <div class="w-full md:w-80 bg-gray-800 p-4 md:p-6 shadow-2xl overflow-y-auto flex-shrink-0">
+        <div class="flex items-center mb-6">
+            <svg class="w-8 h-8 text-emerald-400 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            <h1 class="text-2xl font-bold text-white">Routing Lab</h1>
+        </div>
+
+        <div class="space-y-6">
+            <!-- Algorithm Selection -->
+            <div>
+                <label for="algorithm" class="block text-sm font-medium text-gray-400 mb-2">Algorithm</label>
+                <select id="algorithm" class="w-full bg-gray-700 text-white border-gray-600 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                    <option value="dijkstra">Dijkstra (Link-State)</option>
+                    <option value="bellman-ford">Bellman-Ford (Distance-Vector)</option>
+                    <option value="flooding">Flooding (Flow-based)</option>
+                </select>
+            </div>
+
+            <!-- Source/Destination Selection -->
+            <div class="flex flex-col sm:flex-row sm:space-x-4 space-y-4 sm:space-y-0">
+                <div class="flex-1">
+                    <label for="sourceNode" class="block text-sm font-medium text-gray-400 mb-2">Source</label>
+                    <select id="sourceNode" class="w-full bg-gray-700 text-white border-gray-600 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500"></select>
+                </div>
+                <div class="flex-1">
+                    <label for="destNode" class="block text-sm font-medium text-gray-400 mb-2">Destination</label>
+                    <select id="destNode" class="w-full bg-gray-700 text-white border-gray-600 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500"></select>
+                </div>
+            </div>
+
+            <!-- Simulation Controls -->
+            <div>
+                <h2 class="text-lg font-semibold text-white mb-3 border-b border-gray-600 pb-2">Simulation Controls</h2>
+                <div class="flex flex-col space-y-3">
+                    <button id="runSimulation" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2 px-4 rounded-lg transition duration-300 ease-in-out transform hover:scale-105">
+                        Prepare Simulation
+                    </button>
+                    <div class="flex space-x-2">
+                        <button id="playPauseBtn" class="w-1/2 bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg transition duration-300 disabled:bg-gray-600 disabled:cursor-not-allowed" disabled>Play</button>
+                        <button id="nextStepBtn" class="w-1/2 bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg transition duration-300 disabled:bg-gray-600 disabled:cursor-not-allowed" disabled>Next Step</button>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <label for="speedSlider" class="text-sm font-medium text-gray-400">Speed:</label>
+                        <input type="range" id="speedSlider" min="100" max="2000" value="1000" class="w-full">
+                    </div>
+                    <button id="resetSimulation" class="w-full bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300">
+                        Reset
+                    </button>
+                </div>
+            </div>
+
+            <!-- Instructions -->
+            <div>
+                <h2 class="text-lg font-semibold text-white mb-3 border-b border-gray-600 pb-2">Instructions</h2>
+                <ul class="space-y-2 text-sm text-gray-400">
+                    <li><span class="font-bold text-emerald-400">Simulate:</span> Choose an algorithm, source, and destination, then prepare & play the simulation.</li>
+                     <li><span class="font-bold text-emerald-400">Reset:</span> Use the reset button to clear the current simulation state.</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="flex-1 flex flex-col bg-gray-900 overflow-hidden">
+        <!-- Visualization Area -->
+        <div id="visualization" class="flex-1 bg-gray-900 relative"></div>
+
+        <!-- Output/Results Panel -->
+        <div id="output" class="h-40 md:h-48 bg-gray-800 p-4 border-t-2 border-gray-700 overflow-y-auto flex-shrink-0">
+            <h2 class="text-lg font-semibold text-white mb-2">Simulation Output</h2>
+            <textarea id="outputText" class="text-sm text-gray-300 whitespace-pre-wrap bg-gray-900 w-full h-full border-0 focus:ring-0" readonly></textarea>
+        </div>
+    </div>
+    
+    <!-- Toast Notification -->
+    <div id="toast" class="toast"></div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const vizElement = document.getElementById('visualization');
+            let width = vizElement.clientWidth;
+            let height = vizElement.clientHeight;
+
+            let nodes = [];
+            let links = [];
+
+            const svg = d3.select("#visualization").append("svg")
+                .attr("width", width)
+                .attr("height", height);
+
+            svg.append('defs').append('marker')
+                .attr('id', 'arrowhead')
+                .attr('viewBox', '-0 -5 10 10')
+                .attr('refX', 23).attr('refY', 0).attr('orient', 'auto')
+                .attr('markerWidth', 10).attr('markerHeight', 10)
+                .attr('xoverflow', 'visible')
+                .append('svg:path').attr('d', 'M 0,-5 L 10 ,0 L 0,5')
+                .attr('fill', '#999').style('stroke', 'none');
+
+            let link = svg.append("g").selectAll(".link");
+            let node = svg.append("g").selectAll(".node");
+            let linkText = svg.append("g").selectAll(".link-text");
+
+            const simulation = d3.forceSimulation(nodes)
+                .force("link", d3.forceLink(links).id(d => d.id).distance(120))
+                .force("charge", d3.forceManyBody().strength(-400))
+                .force("center", d3.forceCenter(width / 2, height / 2))
+                .on("tick", ticked);
+
+            // UI Elements
+            const algorithmSelect = document.getElementById('algorithm');
+            const sourceNodeSelect = document.getElementById('sourceNode');
+            const destNodeSelect = document.getElementById('destNode');
+            const runBtn = document.getElementById('runSimulation');
+            const resetBtn = document.getElementById('resetSimulation');
+            const outputText = document.getElementById('outputText');
+            const toast = document.getElementById('toast');
+            const playPauseBtn = document.getElementById('playPauseBtn');
+            const nextStepBtn = document.getElementById('nextStepBtn');
+            const speedSlider = document.getElementById('speedSlider');
+
+            let simulationSteps = [];
+            let currentStep = -1;
+            let isPlaying = false;
+            let playInterval = null;
+            let simulationConfig = {};
+
+            function update() {
+                node = node.data(nodes, d => d.id);
+                node.exit().remove();
+                const nodeEnter = node.enter().append("g")
+                    .attr("class", "node")
+                    .call(d3.drag().on("start", dragstarted).on("drag", dragged).on("end", dragended));
+
+                nodeEnter.append("circle").attr("r", 20).attr("stroke", "#4A5568").attr("stroke-width", 2);
+                nodeEnter.append("text").attr("dy", ".35em").attr("text-anchor", "middle")
+                    .style("fill", "white").style("font-weight", "bold").text(d => d.id);
+                
+                node = nodeEnter.merge(node);
+                
+                node.selectAll('circle').attr("fill", d => {
+                    switch (d.state) {
+                        case 'visiting': return '#4299E1';
+                        case 'visited': return '#4A5568';
+                        case 'path': return '#48BB78';
+                        case 'source': return '#6B46C1';
+                        case 'destination': return '#D53F8C';
+                        default: return '#2D3748';
+                    }
+                });
+
+                link = link.data(links, d => `${d.source.id}-${d.target.id}`);
+                link.exit().remove();
+                link = link.enter().append("line")
+                    .attr("class", "link")
+                    .attr("marker-end", "url(#arrowhead)")
+                    .merge(link);
+                
+                link.attr('stroke', d => d.state === 'checking' ? '#F6E05E' : (d.state === 'path' ? '#48BB78' : '#4A5568'))
+                    .attr('stroke-width', d => (d.state === 'checking' || d.state === 'path') ? 5 : 2);
+
+                linkText = linkText.data(links, d => `${d.source.id}-${d.target.id}`);
+                linkText.exit().remove();
+                linkText = linkText.enter().append("text")
+                    .attr("class", "link-text").style("fill", "#A0AEC0").style("font-size", "12px")
+                    .attr("dy", -5).text(d => d.cost).merge(linkText);
+
+                simulation.nodes(nodes);
+                simulation.force("link").links(links);
+                simulation.alpha(1).restart();
+                updateNodeSelectors();
+            }
+
+            function ticked() {
+                const nodeRadius = 20;
+                node.attr("transform", d => {
+                    d.x = Math.max(nodeRadius, Math.min(width - nodeRadius, d.x));
+                    d.y = Math.max(nodeRadius, Math.min(height - nodeRadius, d.y));
+                    return `translate(${d.x},${d.y})`;
+                });
+                link.attr("x1", d => d.source.x).attr("y1", d => d.source.y)
+                    .attr("x2", d => d.target.x).attr("y2", d => d.target.y);
+                linkText.attr("x", d => (d.source.x + d.target.x) / 2).attr("y", d => (d.source.y + d.target.y) / 2);
+            }
+
+            function dragstarted(event, d) { if (!event.active) simulation.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; }
+            function dragged(event, d) { d.fx = event.x; d.fy = event.y; }
+            function dragended(event, d) { if (!event.active) simulation.alphaTarget(0); d.fx = null; d.fy = null; }
+
+
+            function updateNodeSelectors() {
+                const sourceVal = sourceNodeSelect.value;
+                const destVal = destNodeSelect.value;
+                sourceNodeSelect.innerHTML = '';
+                destNodeSelect.innerHTML = '';
+
+                if (nodes.length === 0) {
+                    sourceNodeSelect.add(new Option('No nodes', '', true, true));
+                    destNodeSelect.add(new Option('No nodes', '', true, true));
+                    sourceNodeSelect.disabled = true;
+                    destNodeSelect.disabled = true;
+                    return;
+                }
+
+                sourceNodeSelect.disabled = false;
+                destNodeSelect.disabled = false;
+                
+                nodes.forEach(n => {
+                    sourceNodeSelect.add(new Option(n.id, n.id));
+                    destNodeSelect.add(new Option(n.id, n.id));
+                });
+                sourceNodeSelect.value = nodes.some(n => n.id === sourceVal) ? sourceVal : nodes[0].id;
+                destNodeSelect.value = nodes.some(n => n.id === destVal) ? destVal : (nodes.length > 1 ? nodes[1].id : nodes[0].id);
+            }
+
+            runBtn.addEventListener('click', () => {
+                resetSimulationState();
+                const algorithm = algorithmSelect.value;
+                const sourceId = sourceNodeSelect.value;
+                const destId = destNodeSelect.value;
+                if (!sourceId || !destId || sourceId === destId) { showToast("Please select a valid source and destination."); return; }
+                
+                simulationConfig = { sourceId, destId, algorithm };
+
+                switch (algorithm) {
+                    case 'dijkstra': simulationSteps = generateDijkstraSteps(sourceId, destId); break;
+                    case 'bellman-ford': simulationSteps = generateBellmanFordSteps(sourceId, destId); break;
+                    case 'flooding': simulationSteps = generateFloodingSteps(sourceId, destId); break;
+                }
+                currentStep = -1;
+                if(simulationSteps.length > 0){
+                    playPauseBtn.disabled = false;
+                    nextStepBtn.disabled = false;
+                    showToast("Simulation prepared. Press Play or Next Step.");
+                } else {
+                    showToast("Could not generate simulation steps.");
+                }
+            });
+
+            nextStepBtn.addEventListener('click', () => { if (isPlaying) pauseSimulation(); executeNextStep(); });
+            playPauseBtn.addEventListener('click', () => { isPlaying ? pauseSimulation() : playSimulation(); });
+
+            function playSimulation() {
+                if (currentStep >= simulationSteps.length - 1) return;
+                isPlaying = true;
+                playPauseBtn.textContent = 'Pause';
+                const delay = 2100 - speedSlider.value;
+                playInterval = setInterval(executeNextStep, delay);
+            }
+            
+            function pauseSimulation() {
+                isPlaying = false;
+                playPauseBtn.textContent = 'Play';
+                clearInterval(playInterval);
+            }
+
+            function executeNextStep() {
+                if (currentStep < simulationSteps.length - 1) {
+                    currentStep++;
+                    executeStep(simulationSteps[currentStep]);
+                } else {
+                    pauseSimulation();
+                    showToast("Simulation finished.");
+                }
+            }
+
+            function executeStep(step) {
+                // Keep source/destination colors, but allow visited state to be temporary
+                nodes.forEach(n => { if(n.state === 'visiting') n.state = 'visited'; });
+                links.forEach(l => { if(l.state === 'checking') l.state = null; });
+
+                switch(step.type) {
+                    case 'start':
+                        nodes.forEach(n => {
+                            if (n.id === step.sourceId) n.state = 'source';
+                            else if (n.id === step.destId) n.state = 'destination';
+                            else n.state = null;
+                        });
+                        break;
+                    case 'visit':
+                        const visitedNode = nodes.find(n => n.id === step.nodeId);
+                        if (visitedNode && !['source', 'destination'].includes(visitedNode.state)) {
+                            visitedNode.state = 'visiting';
+                        }
+                        break;
+                    case 'check_link':
+                        const checkedLink = findLink(step.sourceId, step.targetId);
+                        if (checkedLink) checkedLink.state = 'checking';
+                        break;
+                    case 'path':
+                        const pathLink = findLink(step.sourceId, step.targetId);
+                        const pathNodeSource = nodes.find(n => n.id === step.sourceId);
+                        const pathNodeTarget = nodes.find(n => n.id === step.targetId);
+                        if(pathLink) pathLink.state = 'path';
+                        if(pathNodeSource && pathNodeSource.state !== 'source') pathNodeSource.state = 'path';
+                        if(pathNodeTarget && pathNodeTarget.state !== 'destination') pathNodeTarget.state = 'path';
+                        break;
+                }
+                outputText.value += step.log + '\n';
+                outputText.scrollTop = outputText.scrollHeight;
+                update();
+            }
+
+            function resetSimulationState() {
+                pauseSimulation();
+                simulationSteps = [];
+                currentStep = -1;
+                simulationConfig = {};
+                nodes.forEach(n => n.state = null);
+                links.forEach(l => l.state = null);
+                outputText.value = '';
+                playPauseBtn.disabled = true;
+                nextStepBtn.disabled = true;
+                update();
+            }
+            resetBtn.addEventListener('click', resetSimulationState);
+
+            function findLink(nodeId1, nodeId2) { return links.find(l => (l.source.id === nodeId1 && l.target.id === nodeId2) || (l.source.id === nodeId2 && l.target.id === nodeId1)); }
+            
+            function generateDijkstraSteps(startNode, endNode) {
+                const steps = [];
+                const adj = getAdjacencyList();
+                const distances = {};
+                const prev = {};
+                const pq = new PriorityQueue();
+                
+                steps.push({ type: 'start', sourceId: startNode, destId: endNode, log: `--- Starting Dijkstra from ${startNode} to ${endNode} ---`});
+
+                nodes.forEach(node => { distances[node.id] = Infinity; prev[node.id] = null; });
+                distances[startNode] = 0;
+                pq.enqueue(startNode, 0);
+                steps.push({ log: `Initialization: Distance to ${startNode} is 0. All others are infinity.`});
+
+                while (!pq.isEmpty()) {
+                    let { element: u } = pq.dequeue();
+                    steps.push({ type: 'visit', nodeId: u, log: `\nVisiting node ${u}. Current distance: ${distances[u]}.`});
+
+                    if (u === endNode) { steps.push({log: `Destination ${endNode} reached.`}); break; }
+
+                    const neighbors = adj.get(u) || [];
+                    neighbors.forEach(neighbor => {
+                        let v = neighbor.node;
+                        let weight = neighbor.weight;
+                        let newDist = distances[u] + weight;
+                        steps.push({ type: 'check_link', sourceId: u, targetId: v, log: `  Checking neighbor ${v}. Path cost: ${newDist}`});
+
+                        if (newDist < distances[v]) {
+                            distances[v] = newDist;
+                            prev[v] = u;
+                            pq.enqueue(v, newDist);
+                            steps.push({ log: `    Update: New shorter path to ${v} found. Cost: ${newDist}, Previous: ${u}.`});
+                        }
+                    });
+                }
+                
+                let path = [];
+                let current = endNode;
+                while(current) { path.unshift(current); current = prev[current]; }
+
+                if (path.length > 0 && path[0] === startNode) {
+                    steps.push({ log: `\nFinal Path: ${path.join(' -> ')} (Cost: ${distances[endNode]})` });
+                    for (let i = 0; i < path.length - 1; i++) {
+                        steps.push({type: 'path', sourceId: path[i], targetId: path[i+1], log: `Highlighting path segment: ${path[i]} -> ${path[i+1]}`})
+                    }
+                } else {
+                    steps.push({log: `\nNo path found from ${startNode} to ${endNode}.`});
+                }
+                return steps;
+            }
+
+            function generateBellmanFordSteps(startNode, endNode) {
+                const steps = [];
+                const distances = {};
+                const predecessors = {};
+                steps.push({ type: 'start', sourceId: startNode, destId: endNode, log: `--- Starting Bellman-Ford from ${startNode} ---` });
+                
+                nodes.forEach(node => { distances[node.id] = Infinity; predecessors[node.id] = null; });
+                distances[startNode] = 0;
+                steps.push({ log: `Initialization: Distance to ${startNode} is 0. All others are infinity.\n` });
+
+                const allLinks = [];
+                links.forEach(l => { allLinks.push({ source: l.source.id, target: l.target.id, cost: l.cost }); allLinks.push({ source: l.target.id, target: l.source.id, cost: l.cost }); });
+                
+                for (let i = 0; i < nodes.length - 1; i++) {
+                    steps.push({ log: `--- Iteration ${i + 1} ---` });
+                    let updatedInIteration = false;
+                    allLinks.forEach(({ source, target, cost }) => {
+                        steps.push({ type: 'check_link', sourceId: source, targetId: target, log: `  Checking edge ${source}->${target}` });
+                        if (distances[source] !== Infinity && distances[source] + cost < distances[target]) {
+                            distances[target] = distances[source] + cost;
+                            predecessors[target] = source;
+                            updatedInIteration = true;
+                            steps.push({ log: `    Update: New shorter path to ${target} found. Cost: ${distances[target]}` });
+                        }
+                    });
+                    if (!updatedInIteration) {
+                        steps.push({ log: `No updates in this iteration. Algorithm can terminate early.\n` });
+                        break;
+                    }
+                }
+                
+                let path = [];
+                let current = endNode;
+                while(current) { path.unshift(current); current = predecessors[current]; }
+                if (path.length > 0 && path[0] === startNode) {
+                    steps.push({ log: `\nFinal Path: ${path.join(' -> ')} (Cost: ${distances[endNode]})` });
+                    for (let i = 0; i < path.length - 1; i++) {
+                        steps.push({type: 'path', sourceId: path[i], targetId: path[i+1], log: `Highlighting path: ${path[i]}->${path[i+1]}`});
+                    }
+                } else {
+                    steps.push({log: `\nNo path found from ${startNode} to ${endNode}.`});
+                }
+                return steps;
+            }
+
+            function generateFloodingSteps(startNode, endNode) {
+                const steps = [];
+                const adj = getAdjacencyList();
+                let finalPath = [];
+                const MAX_HOPS = nodes.length;
+                steps.push({ type: 'start', sourceId: startNode, destId: endNode, log: `--- Starting Flooding from ${startNode} to ${endNode} ---`});
+
+                function flood(currentNodeId, path) {
+                    if (path.length > MAX_HOPS || finalPath.length > 0) return;
+                    
+                    steps.push({type: 'visit', nodeId: currentNodeId, log: `Packet at ${currentNodeId}. Path: ${path.join('->')}`});
+                    
+                    if (currentNodeId === endNode) {
+                        steps.push({log: `  Destination ${endNode} reached! First path found.`});
+                        finalPath = [...path];
+                        return;
+                    }
+                    
+                    const neighbors = adj.get(currentNodeId) || [];
+                    if(neighbors.length > 0) {
+                        steps.push({log: `  Flooding from ${currentNodeId} to neighbors: ${neighbors.map(n=>n.node).join(', ')}`});
+                    }
+                    for (const neighbor of neighbors) {
+                        if (path.includes(neighbor.node)) continue;
+                        steps.push({type: 'check_link', sourceId: currentNodeId, targetId: neighbor.node, log: `  Sending packet ${currentNodeId} -> ${neighbor.node}`});
+                        if (finalPath.length === 0) {
+                            flood(neighbor.node, [...path, neighbor.node]);
+                        }
+                    }
+                }
+
+                flood(startNode, [startNode]);
+                
+                if (finalPath.length > 0) {
+                    steps.push({ log: `\nVisualizing first path found: ${finalPath.join(' -> ')}` });
+                    for (let i = 0; i < finalPath.length - 1; i++) {
+                        steps.push({type: 'path', sourceId: finalPath[i], targetId: finalPath[i+1], log: `Highlighting path: ${finalPath[i]}->${finalPath[i+1]}`});
+                    }
+                } else {
+                    steps.push({log: `\nNo path found from ${startNode} to ${endNode} within hop limit.`});
+                }
+                return steps;
+            }
+
+            function getAdjacencyList() {
+                const adj = new Map();
+                nodes.forEach(n => adj.set(n.id, []));
+                links.forEach(l => { 
+                    adj.get(l.source.id).push({ node: l.target.id, weight: l.cost }); 
+                    adj.get(l.target.id).push({ node: l.source.id, weight: l.cost }); 
+                });
+                return adj;
+            }
+
+            class PriorityQueue { 
+                constructor() { this.collection = []; } 
+                enqueue(element, priority) { 
+                    const newElement = { element, priority };
+                    if (this.isEmpty()) { 
+                        this.collection.push(newElement); 
+                    } else { 
+                        let added = false;
+                        for (let i = 0; i < this.collection.length; i++) { 
+                            if (newElement.priority < this.collection[i].priority) { 
+                                this.collection.splice(i, 0, newElement); 
+                                added = true; 
+                                break; 
+                            } 
+                        } 
+                        if (!added) { 
+                            this.collection.push(newElement); 
+                        } 
+                    } 
+                }; 
+                dequeue() { return this.collection.shift(); }; 
+                isEmpty() { return (this.collection.length === 0); }; 
+            }
+            function showToast(message) { toast.textContent = message; toast.className = "toast show"; setTimeout(function(){ toast.className = toast.className.replace("show", ""); }, 3000); }
+
+            function createDefaultNetwork() {
+                nodes.push({id: "A", x: width/3, y: height/3});
+                nodes.push({id: "B", x: 2*width/3, y: height/3});
+                nodes.push({id: "C", x: width/2, y: 2*height/3});
+                nodes.push({id: "D", x: width/3, y: 2*height/3 + 50});
+                nodes.push({id: "E", x: 2*width/3, y: 2*height/3 + 50});
+                links.push({source: nodes[0], target: nodes[1], cost: 7});
+                links.push({source: nodes[0], target: nodes[2], cost: 2});
+                links.push({source: nodes[1], target: nodes[2], cost: 1});
+                links.push({source: nodes[2], target: nodes[3], cost: 4});
+                links.push({source: nodes[1], target: nodes[4], cost: 3});
+                links.push({source: nodes[3], target: nodes[4], cost: 5});
+                update();
+            }
+            
+            const ro = new ResizeObserver(entries => {
+                for (let entry of entries) {
+                    width = entry.contentRect.width;
+                    height = entry.contentRect.height;
+                    svg.attr('width', width).attr('height', height);
+                    simulation.force('center', d3.forceCenter(width / 2, height / 2)).alpha(0.3).restart();
+                }
+            });
+            ro.observe(vizElement);
+
+            createDefaultNetwork();
+
+        });
+    </script>
+</body>
+</html>
+
