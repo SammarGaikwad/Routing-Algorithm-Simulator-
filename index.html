@@ -71,9 +71,16 @@
             border-radius: 10px;
             border: 2px solid #2D3748;
         }
+        
+        /* Ensure SVG fills its container */
+        #visualization svg {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
     </style>
 </head>
-<body class="bg-gray-900 text-gray-100 flex flex-col md:flex-row h-screen overflow-hidden">
+<body class="bg-gray-900 text-gray-100 flex flex-col md:flex-row md:h-screen md:overflow-hidden">
 
     <!-- Controls Panel -->
     <div class="w-full md:w-80 bg-gray-800 p-6 shadow-2xl overflow-y-auto flex-shrink-0">
@@ -138,12 +145,12 @@
     </div>
 
     <!-- Main Content -->
-    <div class="flex-1 flex flex-col bg-gray-900 overflow-hidden">
+    <div class="flex-1 flex flex-col bg-gray-900 md:overflow-hidden min-h-0">
         <!-- Visualization Area -->
-        <div id="visualization" class="flex-1 bg-gray-900 relative"></div>
+        <div id="visualization" class="h-80 md:h-auto flex-1 bg-gray-900 relative"></div>
 
         <!-- Output/Results Panel -->
-        <div id="output" class="h-64 bg-gray-800 p-4 border-t-2 border-gray-700 overflow-y-auto flex-shrink-0">
+        <div id="output" class="h-56 md:h-64 bg-gray-800 p-4 border-t-2 border-gray-700 overflow-y-auto flex-shrink-0">
             <h2 class="text-lg font-semibold text-white mb-2">Simulation Output</h2>
             <textarea id="outputText" class="text-sm text-gray-300 whitespace-pre-wrap bg-gray-900 w-full h-full border-0 focus:ring-0" readonly></textarea>
         </div>
@@ -161,9 +168,7 @@
             let nodes = [];
             let links = [];
 
-            const svg = d3.select("#visualization").append("svg")
-                .attr("width", width)
-                .attr("height", height);
+            const svg = d3.select("#visualization").append("svg");
 
             svg.append('defs').append('marker')
                 .attr('id', 'arrowhead')
@@ -578,14 +583,18 @@
                 update();
             }
             
-            createDefaultNetwork();
-
-            window.addEventListener('resize', () => {
-                width = vizElement.clientWidth;
-                height = vizElement.clientHeight;
-                svg.attr('width', width).attr('height', height);
-                simulation.force('center', d3.forceCenter(width / 2, height / 2)).restart();
+            const ro = new ResizeObserver(entries => {
+                for (let entry of entries) {
+                    width = entry.contentRect.width;
+                    height = entry.contentRect.height;
+                    svg.attr('width', width).attr('height', height);
+                    simulation.force('center', d3.forceCenter(width / 2, height / 2)).restart();
+                }
             });
+
+            ro.observe(vizElement);
+
+            createDefaultNetwork();
         });
     </script>
 </body>
