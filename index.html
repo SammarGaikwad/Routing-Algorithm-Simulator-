@@ -71,20 +71,12 @@
             border-radius: 10px;
             border: 2px solid #2D3748;
         }
-        
-        /* Ensure the body takes up full height for the flex layout to work */
-        html, body {
-            height: 100%;
-            margin: 0;
-            padding: 0;
-            overflow: hidden;
-        }
     </style>
 </head>
-<body class="bg-gray-900 text-gray-100 flex flex-col md:flex-row h-full overflow-hidden">
+<body class="bg-gray-900 text-gray-100 flex flex-col md:flex-row h-screen overflow-hidden">
 
     <!-- Controls Panel -->
-    <div class="w-full md:w-80 bg-gray-800 p-4 md:p-6 shadow-2xl overflow-y-auto flex-shrink-0">
+    <div class="w-full md:w-80 bg-gray-800 p-6 shadow-2xl overflow-y-auto flex-shrink-0">
         <div class="flex items-center mb-6">
             <svg class="w-8 h-8 text-emerald-400 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
             <h1 class="text-2xl font-bold text-white">Routing Lab</h1>
@@ -102,12 +94,12 @@
             </div>
 
             <!-- Source/Destination Selection -->
-            <div class="flex flex-col sm:flex-row sm:space-x-4 space-y-4 sm:space-y-0">
-                <div class="flex-1">
+            <div class="flex space-x-4">
+                <div>
                     <label for="sourceNode" class="block text-sm font-medium text-gray-400 mb-2">Source</label>
                     <select id="sourceNode" class="w-full bg-gray-700 text-white border-gray-600 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500"></select>
                 </div>
-                <div class="flex-1">
+                <div>
                     <label for="destNode" class="block text-sm font-medium text-gray-400 mb-2">Destination</label>
                     <select id="destNode" class="w-full bg-gray-700 text-white border-gray-600 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500"></select>
                 </div>
@@ -151,7 +143,7 @@
         <div id="visualization" class="flex-1 bg-gray-900 relative"></div>
 
         <!-- Output/Results Panel -->
-        <div id="output" class="h-40 md:h-48 bg-gray-800 p-4 border-t-2 border-gray-700 overflow-y-auto flex-shrink-0">
+        <div id="output" class="h-64 bg-gray-800 p-4 border-t-2 border-gray-700 overflow-y-auto flex-shrink-0">
             <h2 class="text-lg font-semibold text-white mb-2">Simulation Output</h2>
             <textarea id="outputText" class="text-sm text-gray-300 whitespace-pre-wrap bg-gray-900 w-full h-full border-0 focus:ring-0" readonly></textarea>
         </div>
@@ -214,8 +206,7 @@
                 node = node.data(nodes, d => d.id);
                 node.exit().remove();
                 const nodeEnter = node.enter().append("g")
-                    .attr("class", "node")
-                    .call(d3.drag().on("start", dragstarted).on("drag", dragged).on("end", dragended));
+                    .attr("class", "node");
 
                 nodeEnter.append("circle").attr("r", 20).attr("stroke", "#4A5568").attr("stroke-width", 2);
                 nodeEnter.append("text").attr("dy", ".35em").attr("text-anchor", "middle")
@@ -267,11 +258,6 @@
                     .attr("x2", d => d.target.x).attr("y2", d => d.target.y);
                 linkText.attr("x", d => (d.source.x + d.target.x) / 2).attr("y", d => (d.source.y + d.target.y) / 2);
             }
-
-            function dragstarted(event, d) { if (!event.active) simulation.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; }
-            function dragged(event, d) { d.fx = event.x; d.fy = event.y; }
-            function dragended(event, d) { if (!event.active) simulation.alphaTarget(0); d.fx = null; d.fy = null; }
-
 
             function updateNodeSelectors() {
                 const sourceVal = sourceNodeSelect.value;
@@ -592,18 +578,14 @@
                 update();
             }
             
-            const ro = new ResizeObserver(entries => {
-                for (let entry of entries) {
-                    width = entry.contentRect.width;
-                    height = entry.contentRect.height;
-                    svg.attr('width', width).attr('height', height);
-                    simulation.force('center', d3.forceCenter(width / 2, height / 2)).alpha(0.3).restart();
-                }
-            });
-            ro.observe(vizElement);
-
             createDefaultNetwork();
 
+            window.addEventListener('resize', () => {
+                width = vizElement.clientWidth;
+                height = vizElement.clientHeight;
+                svg.attr('width', width).attr('height', height);
+                simulation.force('center', d3.forceCenter(width / 2, height / 2)).restart();
+            });
         });
     </script>
 </body>
